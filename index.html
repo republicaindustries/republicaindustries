@@ -119,7 +119,7 @@
             <a href="#home" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Home</a>
             <a href="#about" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">About Us</a>
             <a href="#services" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Services</a>
-            <a href="#idea-sparker" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Idea Sparker</a>
+            <!-- Removed Idea Sparker Link -->
             <a href="#portfolio" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Portfolio</a>
             <a href="#team" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Team</a>
             <a href="#insights" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Insights</a>
@@ -139,7 +139,7 @@
         <a href="#home" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Home</a>
         <a href="#about" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">About Us</a>
         <a href="#services" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Services</a>
-        <a href="#idea-sparker" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Idea Sparker</a>
+        <!-- Removed Idea Sparker Link -->
         <a href="#portfolio" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Portfolio</a>
         <a href="#team" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Team</a>
         <a href="#insights" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Insights</a>
@@ -241,7 +241,8 @@
             </div>
         </section>
 
-        <!-- Idea Sparker Section (New) -->
+        <!-- Removed Idea Sparker Section (New) -->
+        <!--
         <section id="idea-sparker" class="py-16 md:py-24 bg-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
             <div class="container mx-auto text-center">
                 <h3 class="text-3xl md:text-4xl font-bold text-indigo-800 mb-12">✨ Spark Your Next Big Idea!</h3>
@@ -263,6 +264,7 @@
                 </div>
             </div>
         </section>
+        -->
 
         <!-- Our Portfolio Section -->
         <section id="portfolio" class="py-16 md:py-24 bg-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
@@ -277,7 +279,7 @@
                         <h4 class="text-lg font-semibold text-gray-800">InnovateTech</h4>
                         <p class="text-sm text-gray-600">AI Solutions</p>
                     </div>
-                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <div class="flex flex-col items-center">
                         <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+B" alt="Company B Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
                         <h4 class="text-lg font-semibold text-gray-800">HealthConnect</h4>
                         <p class="text-sm text-gray-600">Digital Health</p>
@@ -464,7 +466,8 @@
                 blending: THREE.AdditiveBlending // For a glowing effect
             });
 
-            for (let i = 0; i < 70; i++) { // Increased number of objects
+            // Add multiple objects to the scene
+            for (let i = 0; i < 50; i++) {
                 let object;
                 if (Math.random() > 0.5) {
                     object = new THREE.Mesh(cubeGeometry, objectMaterial);
@@ -472,30 +475,35 @@
                     object = new THREE.Mesh(sphereGeometry, objectMaterial);
                 }
 
-                object.position.x = (Math.random() - 0.5) * 25; // Wider spread
-                object.position.y = (Math.random() - 0.5) * 25;
-                object.position.z = (Math.random() - 0.5) * 25;
+                // Random positions
+                object.position.x = Math.random() * 10 - 5;
+                object.position.y = Math.random() * 10 - 5;
+                object.position.z = Math.random() * 10 - 5;
 
-                object.rotation.x = Math.random() * Math.PI;
-                object.rotation.y = Math.random() * Math.PI;
-                object.rotation.z = Math.random() * Math.PI;
+                // Random rotations
+                object.rotation.x = Math.random() * 2 * Math.PI;
+                object.rotation.y = Math.random() * 2 * Math.PI;
+                object.rotation.z = Math.random() * 2 * Math.PI;
 
-                objects.push(object);
                 scene.add(object);
+                objects.push(object);
             }
 
-            // Add ambient light
+            // Lights
+            pointLight = new THREE.PointLight(0xffffff, 1); // White light
+            pointLight.position.set(0, 0, 10);
+            scene.add(pointLight);
+
             const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
             scene.add(ambientLight);
 
-            // Add a dynamic point light
-            pointLight = new THREE.PointLight(0xffffff, 1, 100); // White light, intensity 1, distance 100
-            scene.add(pointLight);
+            // Event Listeners for mouse interaction
+            document.addEventListener('mousemove', onDocumentMouseMove);
+            document.addEventListener('touchstart', onDocumentTouchStart);
+            document.addEventListener('touchmove', onDocumentTouchMove);
 
-            // Event Listeners
-            window.addEventListener('resize', onWindowResize, false);
-            document.addEventListener('mousemove', onDocumentMouseMove, false);
-            document.addEventListener('touchmove', onDocumentTouchMove, { passive: false });
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
         }
 
         function onWindowResize() {
@@ -508,52 +516,62 @@
         }
 
         function onDocumentMouseMove(event) {
-            mouseX = (event.clientX - windowHalfX) / 100;
-            mouseY = (event.clientY - windowHalfY) / 100;
+            mouseX = (event.clientX - windowHalfX) * 0.005;
+            mouseY = (event.clientY - windowHalfY) * 0.005;
+        }
+
+        function onDocumentTouchStart(event) {
+            if (event.touches.length === 1) {
+                event.preventDefault(); // Prevent scrolling
+                mouseX = (event.touches[0].pageX - windowHalfX) * 0.005;
+                mouseY = (event.touches[0].pageY - windowHalfY) * 0.005;
+            }
         }
 
         function onDocumentTouchMove(event) {
             if (event.touches.length === 1) {
                 event.preventDefault(); // Prevent scrolling
-                mouseX = (event.touches[0].pageX - windowHalfX) / 100;
-                mouseY = (event.touches[0].pageY - windowHalfY) / 100;
+                mouseX = (event.touches[0].pageX - windowHalfX) * 0.005;
+                mouseY = (event.touches[0].pageY - windowHalfY) * 0.005;
             }
         }
 
+        // Animation loop for Three.js
         function animate() {
             requestAnimationFrame(animate);
+            render();
+        }
 
-            const time = Date.now() * 0.0005;
-
+        function render() {
             // Rotate objects
-            objects.forEach(object => {
-                object.rotation.x += 0.002;
-                object.rotation.y += 0.003;
-            });
-
-            // Animate point light position to create dynamic lighting
-            pointLight.position.x = Math.sin(time * 0.7) * 5;
-            pointLight.position.y = Math.cos(time * 0.5) * 5;
-            pointLight.position.z = Math.cos(time * 0.3) * 5;
-
-            // Camera movement based on mouse
+            const timer = 0.0001 * Date.now();
             camera.position.x += (mouseX - camera.position.x) * .05;
-            camera.position.y += (-mouseY - camera.position.y) * .05;
+            camera.position.y += (- mouseY - camera.position.y) * .05;
             camera.lookAt(scene.position);
+
+            for (let i = 0, il = objects.length; i < il; i++) {
+                const object = objects[i];
+                object.rotation.x += 0.005;
+                object.rotation.y += 0.01;
+                object.position.y = 2 * Math.sin(timer + i); // Subtle vertical movement
+            }
 
             renderer.render(scene, camera);
         }
 
-        // Gemini API Integration for Idea Sparker
+        // Function to generate startup ideas using Gemini API (This function is no longer called but kept for reference if needed later)
+        /*
         async function generateStartupIdeas() {
-            const ideaInput = document.getElementById('idea-input').value;
+            const ideaInput = document.getElementById('idea-input');
             const ideaOutput = document.getElementById('idea-output');
             const generateButton = document.getElementById('generate-idea-btn');
             const buttonText = document.getElementById('button-text');
             const loadingSpinner = document.getElementById('loading-spinner');
 
-            if (!ideaInput.trim()) {
-                ideaOutput.innerHTML = '<p class="text-red-500">Please enter some input to generate ideas.</p>';
+            const prompt = ideaInput.value.trim();
+
+            if (!prompt) {
+                ideaOutput.innerHTML = '<p class="text-red-600">Please enter some input to generate ideas.</p>';
                 return;
             }
 
@@ -561,20 +579,14 @@
             buttonText.textContent = 'Generating...';
             loadingSpinner.classList.remove('hidden');
             generateButton.disabled = true;
-            ideaOutput.innerHTML = '<div class="loader"></div><p class="text-gray-500 mt-4">Brainstorming brilliant ideas...</p>';
+            ideaOutput.innerHTML = '<div class="loader"></div><p class="text-center mt-4">Brainstorming innovative ideas for you...</p>';
 
             try {
                 let chatHistory = [];
-                const prompt = `Generate 3 innovative startup ideas based on the following input: "${ideaInput}". For each idea, provide:
-                1. A concise name.
-                2. A one-sentence description.
-                3. A potential target market.
-                
-                Format the output as a numbered list.`;
+                chatHistory.push({ role: "user", parts: [{ text: `Generate 3-5 innovative startup ideas based on the following input: "${prompt}". For each idea, provide a brief description and potential target audience. Format the output clearly with headings for each idea.` }] });
 
-                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
                 const payload = { contents: chatHistory };
-                const apiKey = ""; // Leave this as-is; Canvas will provide it at runtime
+                const apiKey = ""; // Canvas will provide this at runtime
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
@@ -583,30 +595,24 @@
                     body: JSON.stringify(payload)
                 });
 
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown API error'}`);
+                }
+
                 const result = await response.json();
-                console.log("Gemini API raw response:", result); // Log the full response
 
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
-                    const text = result.candidates[0].content.parts[0].text;
-                    // Format the output for better readability
-                    const formattedText = text.replace(/\n/g, '<br>'); // Replace newlines with <br>
-                    ideaOutput.innerHTML = `<div class="p-4 bg-blue-50 border border-blue-200 rounded-md">${formattedText}</div>`;
-                } else if (result.promptFeedback && result.promptFeedback.blockReason) {
-                    // Handle cases where the prompt was blocked by safety filters
-                    const blockReason = result.promptFeedback.blockReason;
-                    console.error("Gemini API blocked prompt:", blockReason);
-                    ideaOutput.innerHTML = `<p class="text-red-500">Idea generation blocked due to safety concerns. Please try a different input.</p>`;
-                }
-                else {
-                    // Fallback for unexpected response structure
-                    console.error("Gemini API returned unexpected structure:", result);
-                    ideaOutput.innerHTML = '<p class="text-red-500">Failed to generate ideas. The API returned an unexpected response. Please try again.</p>';
+                    const generatedText = result.candidates[0].content.parts[0].text;
+                    ideaOutput.innerHTML = `<div class="prose max-w-none">${generatedText.replace(/\n/g, '<br>')}</div>`; // Display generated text
+                } else {
+                    ideaOutput.innerHTML = '<p class="text-red-600">Failed to generate ideas: Unexpected API response structure.</p>';
                 }
             } catch (error) {
-                console.error("Error calling Gemini API:", error);
-                ideaOutput.innerHTML = '<p class="text-red-500">An error occurred while generating ideas. Please check your console for details.</p>';
+                console.error('Error generating startup ideas:', error);
+                ideaOutput.innerHTML = `<p class="text-red-600">Error: ${error.message}. Please try again.</p>`;
             } finally {
                 // Reset button state
                 buttonText.textContent = '✨ Generate Startup Ideas';
@@ -614,9 +620,10 @@
                 generateButton.disabled = false;
             }
         }
+        */
 
-        // Initialize Three.js when the window loads
-        window.onload = function() {
+        // Initialize Three.js and start animation when the window loads
+        window.onload = function () {
             initThreeJS();
             animate();
         };
