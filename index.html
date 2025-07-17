@@ -584,6 +584,7 @@
                 });
 
                 const result = await response.json();
+                console.log("Gemini API raw response:", result); // Log the full response
 
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
@@ -592,12 +593,20 @@
                     // Format the output for better readability
                     const formattedText = text.replace(/\n/g, '<br>'); // Replace newlines with <br>
                     ideaOutput.innerHTML = `<div class="p-4 bg-blue-50 border border-blue-200 rounded-md">${formattedText}</div>`;
-                } else {
-                    ideaOutput.innerHTML = '<p class="text-red-500">Failed to generate ideas. Please try again.</p>';
+                } else if (result.promptFeedback && result.promptFeedback.blockReason) {
+                    // Handle cases where the prompt was blocked by safety filters
+                    const blockReason = result.promptFeedback.blockReason;
+                    console.error("Gemini API blocked prompt:", blockReason);
+                    ideaOutput.innerHTML = `<p class="text-red-500">Idea generation blocked due to safety concerns. Please try a different input.</p>`;
+                }
+                else {
+                    // Fallback for unexpected response structure
+                    console.error("Gemini API returned unexpected structure:", result);
+                    ideaOutput.innerHTML = '<p class="text-red-500">Failed to generate ideas. The API returned an unexpected response. Please try again.</p>';
                 }
             } catch (error) {
                 console.error("Error calling Gemini API:", error);
-                ideaOutput.innerHTML = '<p class="text-red-500">An error occurred while generating ideas. Please try again later.</p>';
+                ideaOutput.innerHTML = '<p class="text-red-500">An error occurred while generating ideas. Please check your console for details.</p>';
             } finally {
                 // Reset button state
                 buttonText.textContent = '✨ Generate Startup Ideas';
