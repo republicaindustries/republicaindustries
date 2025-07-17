@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Republica Industries - Empowering Tomorrow's Innovators</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js CDN for 3D graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase (will be populated by the runtime environment)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth, userId;
+
+        // Initialize Firebase and set up authentication listener
+        async function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Listen for authentication state changes
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User signed in:", userId);
+                        // Load content only after authentication is ready
+                        loadWebsiteContent();
+                    } else {
+                        console.log("No user signed in. Attempting anonymous sign-in.");
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Firebase Auth Error:", error);
+                            // Display a message to the user instead of alert
+                            showMessage("Authentication failed. Please refresh the page.", "error");
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                showMessage("Failed to initialize Firebase. Please check your configuration.", "error");
+            }
+        }
+
+        // Function to load content from Firestore
+        async function loadWebsiteContent() {
+            if (!db || !userId) {
+                console.log("Firestore not initialized or user not authenticated yet.");
+                return;
+            }
+
+            // Path for public data accessible to all authenticated users
+            const contentCollectionRef = collection(db, `artifacts/${appId}/public/data/websiteContent`);
+
+            // Listen for real-time updates to all content documents
+            onSnapshot(contentCollectionRef, (snapshot) => {
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const sectionId = doc.id; // Document ID is the section name (e.g., 'aboutUs', 'services')
+
+                    switch (sectionId) {
+                        case 'aboutUs':
+                            document.getElementById('about-title').textContent = data.title || "About Republica Industries";
+                            document.getElementById('about-paragraph-1').textContent = data.paragraph1 || "At Republica Industries, we believe in the power of groundbreaking ideas...";
+                            document.getElementById('about-paragraph-2').textContent = data.paragraph2 || "From initial concept validation to market entry and scaling...";
+                            document.getElementById('about-paragraph-3').textContent = data.paragraph3 || "Join us, and let's build something extraordinary together.";
+                            document.getElementById('about-image').src = data.imageUrl || "https://placehold.co/600x400/e0e7ff/4f46e5?text=Team+Collaboration";
+                            // Admin form population
+                            document.getElementById('edit-about-title').value = data.title || "";
+                            document.getElementById('edit-about-paragraph-1').value = data.paragraph1 || "";
+                            document.getElementById('edit-about-paragraph-2').value = data.paragraph2 || "";
+                            document.getElementById('edit-about-paragraph-3').value = data.paragraph3 || "";
+                            document.getElementById('edit-about-image-url').value = data.imageUrl || "";
+                            break;
+                        case 'services':
+                            const servicesContainer = document.getElementById('services-container');
+                            servicesContainer.innerHTML = ''; // Clear existing services
+                            data.services.forEach(service => {
+                                const serviceCard = `
+                                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                                        <div class="icon">${service.icon}</div>
+                                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">${service.title}</h4>
+                                        <p class="text-gray-600">${service.description}</p>
+                                    </div>
+                                `;
+                                servicesContainer.innerHTML += serviceCard;
+                            });
+                            // Admin form population (simplified, would need more complex UI for array editing)
+                            document.getElementById('edit-services-json').value = JSON.stringify(data.services, null, 2);
+                            break;
+                        case 'portfolio':
+                            const portfolioContainer = document.getElementById('portfolio-container');
+                            portfolioContainer.innerHTML = ''; // Clear existing portfolio items
+                            data.companies.forEach(company => {
+                                const companyCard = `
+                                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                        <img src="${company.logoUrl}" alt="${company.name} Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                                        <h4 class="text-lg font-semibold text-gray-800">${company.name}</h4>
+                                        <p class="text-sm text-gray-600">${company.sector}</p>
+                                    </div>
+                                `;
+                                portfolioContainer.innerHTML += companyCard;
+                            });
+                            document.getElementById('edit-portfolio-json').value = JSON.stringify(data.companies, null, 2);
+                            break;
+                        case 'team':
+                            const teamContainer = document.getElementById('team-container');
+                            teamContainer.innerHTML = ''; // Clear existing team members
+                            data.members.forEach(member => {
+                                const memberCard = `
+                                    <div class="flex flex-col items-center">
+                                        <img src="${member.imageUrl}" alt="${member.name}" class="w-36 h-36 rounded-full object-cover mb-4 shadow-md">
+                                        <h4 class="text-xl font-semibold text-gray-800">${member.name}</h4>
+                                        <p class="text-indigo-600 text-sm">${member.role}</p>
+                                        <p class="text-gray-600 text-center text-sm mt-2">${member.bio}</p>
+                                    </div>
+                                `;
+                                teamContainer.innerHTML += memberCard;
+                            });
+                            document.getElementById('edit-team-json').value = JSON.stringify(data.members, null, 2);
+                            break;
+                        case 'insights':
+                            const insightsContainer = document.getElementById('insights-container');
+                            insightsContainer.innerHTML = ''; // Clear existing posts
+                            data.posts.forEach(post => {
+                                const postCard = `
+                                    <div class="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 text-left">
+                                        <img src="${post.imageUrl}" alt="${post.title}" class="w-full h-48 object-cover rounded-md mb-4">
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">${post.title}</h4>
+                                        <p class="text-gray-600 text-sm mb-3">${post.content}</p>
+                                        <a href="${post.link}" class="text-indigo-600 hover:underline font-medium">Read More &rarr;</a>
+                                    </div>
+                                `;
+                                insightsContainer.innerHTML += postCard;
+                            });
+                            document.getElementById('edit-insights-json').value = JSON.stringify(data.posts, null, 2);
+                            break;
+                        default:
+                            console.log(`Unknown section ID: ${sectionId}`);
+                    }
+                });
+            }, (error) => {
+                console.error("Error fetching website content:", error);
+                showMessage("Failed to load website content. Please try again.", "error");
+            });
+        }
+
+        // Function to save About Us content to Firestore
+        async function saveAboutUsContent() {
+            if (!db || !userId) {
+                showMessage("Authentication required to save content.", "error");
+                return;
+            }
+            const aboutUsDocRef = doc(db, `artifacts/${appId}/public/data/websiteContent`, 'aboutUs');
+            const newTitle = document.getElementById('edit-about-title').value;
+            const newParagraph1 = document.getElementById('edit-about-paragraph-1').value;
+            const newParagraph2 = document.getElementById('edit-about-paragraph-2').value;
+            const newParagraph3 = document.getElementById('edit-about-paragraph-3').value;
+            const newImageUrl = document.getElementById('edit-about-image-url').value;
+
+            try {
+                await setDoc(aboutUsDocRef, {
+                    title: newTitle,
+                    paragraph1: newParagraph1,
+                    paragraph2: newParagraph2,
+                    paragraph3: newParagraph3,
+                    imageUrl: newImageUrl
+                }, { merge: true }); // Use merge to only update specified fields
+                showMessage("About Us content updated successfully!", "success");
+            } catch (error) {
+                console.error("Error saving About Us content:", error);
+                showMessage("Failed to save About Us content.", "error");
+            }
+        }
+
+        // Function to save Services content to Firestore
+        async function saveServicesContent() {
+            if (!db || !userId) {
+                showMessage("Authentication required to save content.", "error");
+                return;
+            }
+            const servicesDocRef = doc(db, `artifacts/${appId}/public/data/websiteContent`, 'services');
+            const servicesJson = document.getElementById('edit-services-json').value;
+            try {
+                const servicesArray = JSON.parse(servicesJson);
+                await setDoc(servicesDocRef, { services: servicesArray }, { merge: true });
+                showMessage("Services content updated successfully!", "success");
+            } catch (error) {
+                console.error("Error saving Services content:", error);
+                showMessage("Failed to save Services content. Ensure JSON is valid.", "error");
+            }
+        }
+
+        // Function to save Portfolio content to Firestore
+        async function savePortfolioContent() {
+            if (!db || !userId) {
+                showMessage("Authentication required to save content.", "error");
+                return;
+            }
+            const portfolioDocRef = doc(db, `artifacts/${appId}/public/data/websiteContent`, 'portfolio');
+            const portfolioJson = document.getElementById('edit-portfolio-json').value;
+            try {
+                const companiesArray = JSON.parse(portfolioJson);
+                await setDoc(portfolioDocRef, { companies: companiesArray }, { merge: true });
+                showMessage("Portfolio content updated successfully!", "success");
+            } catch (error) {
+                console.error("Error saving Portfolio content:", error);
+                showMessage("Failed to save Portfolio content. Ensure JSON is valid.", "error");
+            }
+        }
+
+        // Function to save Team content to Firestore
+        async function saveTeamContent() {
+            if (!db || !userId) {
+                showMessage("Authentication required to save content.", "error");
+                return;
+            }
+            const teamDocRef = doc(db, `artifacts/${appId}/public/data/websiteContent`, 'team');
+            const teamJson = document.getElementById('edit-team-json').value;
+            try {
+                const membersArray = JSON.parse(teamJson);
+                await setDoc(teamDocRef, { members: membersArray }, { merge: true });
+                showMessage("Team content updated successfully!", "success");
+            } catch (error) {
+                console.error("Error saving Team content:", error);
+                showMessage("Failed to save Team content. Ensure JSON is valid.", "error");
+            }
+        }
+
+        // Function to save Insights content to Firestore
+        async function saveInsightsContent() {
+            if (!db || !userId) {
+                showMessage("Authentication required to save content.", "error");
+                return;
+            }
+            const insightsDocRef = doc(db, `artifacts/${appId}/public/data/websiteContent`, 'insights');
+            const insightsJson = document.getElementById('edit-insights-json').value;
+            try {
+                const postsArray = JSON.parse(insightsJson);
+                await setDoc(insightsDocRef, { posts: postsArray }, { merge: true });
+                showMessage("Insights content updated successfully!", "success");
+            } catch (error) {
+                console.error("Error saving Insights content:", error);
+                showMessage("Failed to save Insights content. Ensure JSON is valid.", "error");
+            }
+        }
+
+        // Simple message display function (replaces alert)
+        function showMessage(message, type = "info") {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[1000] ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Admin Login and Logout
+        async function adminLogin() {
+            const username = document.getElementById('admin-username').value;
+            const password = document.getElementById('admin-password').value;
+
+            // Basic client-side check (for demo purposes only)
+            if (username === 'admin123' && password === 'admin321') {
+                document.getElementById('login-modal').classList.add('hidden');
+                document.getElementById('admin-panel-toggle').classList.remove('hidden');
+                document.getElementById('admin-panel').classList.remove('hidden');
+                showMessage("Admin logged in successfully!", "success");
+            } else {
+                showMessage("Invalid admin credentials.", "error");
+            }
+        }
+
+        function adminLogout() {
+            document.getElementById('admin-panel-toggle').classList.add('hidden');
+            document.getElementById('admin-panel').classList.add('hidden');
+            document.getElementById('login-modal').classList.remove('hidden');
+            showMessage("Admin logged out.", "info");
+        }
+
+        // Expose functions to global scope for HTML event handlers
+        window.initFirebase = initFirebase;
+        window.loadWebsiteContent = loadWebsiteContent;
+        window.saveAboutUsContent = saveAboutUsContent;
+        window.saveServicesContent = saveServicesContent;
+        window.savePortfolioContent = savePortfolioContent;
+        window.saveTeamContent = saveTeamContent;
+        window.saveInsightsContent = saveInsightsContent;
+        window.adminLogin = adminLogin;
+        window.adminLogout = adminLogout;
+        window.showMessage = showMessage; // Expose for general use
+
+    </script>
+    <style>
+        /* Custom CSS for Inter font and general body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Light blue-gray background */
+            color: #334155; /* Slate-700 for general text */
+        }
+        /* Smooth scroll for anchor links */
+        html {
+            scroll-behavior: smooth;
+        }
+        /* Custom button styling for a more pronounced effect */
+        .btn-primary {
+            background-color: #4f46e5; /* Indigo-600 */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #4338ca; /* Indigo-700 */
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background-color: transparent;
+            color: #4f46e5; /* Indigo-600 */
+            padding: 0.75rem 1.5rem;
+            border: 2px solid #4f46e5;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #e0e7ff; /* Indigo-100 */
+            color: #4f46e5;
+            transform: translateY(-2px);
+        }
+        /* Icon styling */
+        .icon {
+            display: inline-block;
+            width: 2.5rem; /* 40px */
+            height: 2.5rem; /* 40px */
+            background-color: #818cf8; /* Indigo-400 */
+            color: white;
+            border-radius: 9999px; /* Full rounded */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Styles for the 3D canvas */
+        #three-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Ensure it's behind content but above hero background */
+            opacity: 0.2; /* Subtle effect */
+        }
+        /* Admin panel specific styles */
+        .admin-section {
+            display: none; /* Hidden by default */
+        }
+        .admin-section.active {
+            display: block;
+        }
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem 0.5rem 0 0;
+            font-weight: 600;
+            background-color: #e0e7ff; /* Indigo-100 */
+            color: #4f46e5; /* Indigo-600 */
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .tab-button.active {
+            background-color: #4f46e5; /* Indigo-600 */
+            color: white;
+        }
+        textarea {
+            min-height: 150px;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header Section -->
+    <header class="bg-white shadow-md py-4 px-6 md:px-12 flex justify-between items-center fixed top-0 left-0 w-full z-50 rounded-b-lg">
+        <div class="flex items-center">
+            <img src="https://placehold.co/40x40/6366f1/ffffff?text=R" alt="Republica Industries Logo" class="h-10 w-10 mr-3 rounded-full shadow-sm">
+            <h1 class="text-2xl font-bold text-indigo-700">Republica Industries</h1>
+        </div>
+        <nav class="hidden md:flex space-x-6">
+            <a href="#home" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Home</a>
+            <a href="#about" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">About Us</a>
+            <a href="#services" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Services</a>
+            <a href="#portfolio" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Portfolio</a>
+            <a href="#team" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Team</a>
+            <a href="#insights" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Insights</a>
+            <a href="#contact" class="text-gray-600 hover:text-indigo-600 font-medium transition duration-300">Contact</a>
+        </nav>
+        <!-- Mobile Menu Button (Hamburger) -->
+        <button class="md:hidden text-gray-600 hover:text-indigo-600 text-3xl focus:outline-none" aria-label="Open menu">
+            &#9776;
+        </button>
+    </header>
+
+    <!-- Mobile Menu Overlay (Hidden by default, toggle with JS) -->
+    <div id="mobile-menu" class="fixed inset-0 bg-white bg-opacity-95 z-40 flex flex-col items-center justify-center space-y-8 hidden md:hidden">
+        <button class="absolute top-6 right-6 text-gray-600 hover:text-indigo-600 text-4xl focus:outline-none" aria-label="Close menu">
+            &times;
+        </button>
+        <a href="#home" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Home</a>
+        <a href="#about" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">About Us</a>
+        <a href="#services" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Services</a>
+        <a href="#portfolio" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Portfolio</a>
+        <a href="#team" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Team</a>
+        <a href="#insights" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Insights</a>
+        <a href="#contact" class="text-3xl text-gray-800 hover:text-indigo-600 font-semibold transition duration-300" onclick="toggleMobileMenu()">Contact</a>
+    </div>
+
+    <main class="pt-20"> <!-- Adjust padding-top to account for fixed header -->
+
+        <!-- Hero Section with 3D Graphics -->
+        <section id="home" class="relative bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-20 md:py-32 overflow-hidden rounded-b-xl shadow-xl">
+            <!-- 3D Canvas will be injected here by Three.js -->
+            <canvas id="three-canvas" aria-hidden="true"></canvas>
+
+            <div class="container mx-auto px-6 text-center relative z-10">
+                <h2 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up">
+                    Empowering Visionaries. <br class="hidden sm:inline">Building Futures.
+                </h2>
+                <p class="text-lg md:text-xl mb-10 max-w-3xl mx-auto opacity-90 animate-fade-in-up delay-200">
+                    Republica Industries is dedicated to nurturing and accelerating the growth of innovative startup companies and organizations. We provide the foundation for your success.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 animate-fade-in-up delay-400">
+                    <a href="#services" class="btn-primary inline-block">Explore Our Services</a>
+                    <a href="#contact" class="btn-secondary inline-block">Get In Touch</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Us Section -->
+        <section id="about" class="py-16 md:py-24 bg-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
+            <div class="container mx-auto">
+                <h3 id="about-title" class="text-3xl md:text-4xl font-bold text-center text-indigo-800 mb-12">About Republica Industries</h3>
+                <div class="flex flex-col md:flex-row items-center md:space-x-12">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <img id="about-image" src="https://placehold.co/600x400/e0e7ff/4f46e5?text=Team+Collaboration" alt="Team Collaboration" class="rounded-lg shadow-xl w-full h-auto object-cover">
+                    </div>
+                    <div class="md:w-1/2 text-lg text-gray-700 leading-relaxed">
+                        <p id="about-paragraph-1" class="mb-6">
+                            At Republica Industries, we believe in the power of groundbreaking ideas. Our mission is to be the catalyst for the next generation of successful enterprises. We partner with ambitious founders and teams, providing them with the strategic guidance, resources, and network necessary to transform their visions into thriving realities.
+                        </p>
+                        <p id="about-paragraph-2" class="mb-6">
+                            From initial concept validation to market entry and scaling, we offer a comprehensive suite of support designed to navigate the complexities of the startup ecosystem. Our experienced mentors, industry connections, and access to capital are all geared towards fostering sustainable growth and impactful innovation.
+                        </p>
+                        <p id="about-paragraph-3">
+                            Join us, and let's build something extraordinary together.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section id="services" class="py-16 md:py-24 bg-gray-50 rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
+            <div class="container mx-auto text-center">
+                <h3 class="text-3xl md:text-4xl font-bold text-indigo-800 mb-12">Our Services</h3>
+                <div id="services-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Service Cards will be loaded dynamically from Firestore -->
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">💡</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Startup Incubation</h4>
+                        <p class="text-gray-600">
+                            Comprehensive programs for early-stage startups, providing workspace, mentorship, and essential resources to help ideas flourish.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">🤝</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Strategic Mentorship</h4>
+                        <p class="text-gray-600">
+                            Connect with industry veterans and successful entrepreneurs for personalized guidance on business strategy, product development, and market fit.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">💰</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Funding & Investment</h4>
+                        <p class="text-gray-600">
+                            Access to our network of angel investors, venture capitalists, and grant opportunities to secure the capital you need to scale.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">📈</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Business Development</h4>
+                        <p class="text-gray-600">
+                            Assistance in crafting robust business plans, market analysis, and go-to-market strategies to ensure sustainable growth.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">💻</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Technology & Product Support</h4>
+                        <p class="text-gray-600">
+                            Guidance on technology stacks, product roadmaps, UI/UX design, and engineering best practices to build cutting-edge solutions.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col items-center text-center">
+                        <div class="icon">🌐</div>
+                        <h4 class="text-xl font-semibold text-indigo-700 mb-3">Networking & Community</h4>
+                        <p class="text-gray-600">
+                            Become part of a vibrant ecosystem of founders, investors, and industry leaders through exclusive events and collaborative spaces.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Our Portfolio Section (New) -->
+        <section id="portfolio" class="py-16 md:py-24 bg-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
+            <div class="container mx-auto text-center">
+                <h3 class="text-3xl md:text-4xl font-bold text-indigo-800 mb-12">Our Portfolio Companies</h3>
+                <p class="text-lg text-gray-700 mb-10 max-w-3xl mx-auto">
+                    We are proud to partner with innovative startups across various sectors, helping them achieve their full potential.
+                </p>
+                <div id="portfolio-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                    <!-- Portfolio Companies will be loaded dynamically from Firestore -->
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+A" alt="Company A Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">InnovateTech</h4>
+                        <p class="text-sm text-gray-600">AI Solutions</p>
+                    </div>
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+B" alt="Company B Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">HealthConnect</h4>
+                        <p class="text-sm text-gray-600">Digital Health</p>
+                    </div>
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+C" alt="Company C Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">EduSpark</h4>
+                        <p class="text-sm text-gray-600">EdTech Platform</p>
+                    </div>
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+D" alt="Company D Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">GreenHarvest</h4>
+                        <p class="text-sm text-gray-600">AgriTech</p>
+                    </div>
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+E" alt="Company E Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">FinFlow</h4>
+                        <p class="text-sm text-gray-600">FinTech Solutions</p>
+                    </div>
+                    <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <img src="https://placehold.co/100x100/6366f1/ffffff?text=Company+F" alt="Company F Logo" class="w-24 h-24 object-contain mb-3 rounded-md">
+                        <h4 class="text-lg font-semibold text-gray-800">Urban Mobility</h4>
+                        <p class="text-sm text-gray-600">Smart Cities</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Meet Our Team Section (New) -->
+        <section id="team" class="py-16 md:py-24 bg-gray-50 rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
+            <div class="container mx-auto text-center">
+                <h3 class="text-3xl md:text-4xl font-bold text-indigo-800 mb-12">Meet Our Team</h3>
+                <p class="text-lg text-gray-700 mb-10 max-w-3xl mx-auto">
+                    Our diverse team of experts brings a wealth of experience in venture capital, technology, and business development.
+                </p>
+                <div id="team-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Team Members will be loaded dynamically from Firestore -->
+                    <div class="flex flex-col items-center">
+                        <img src="https://placehold.co/150x150/818cf8/ffffff?text=John+D" alt="John Doe" class="w-36 h-36 rounded-full object-cover mb-4 shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">John Doe</h4>
+                        <p class="text-indigo-600 text-sm">Managing Partner</p>
+                        <p class="text-gray-600 text-center text-sm mt-2">Focuses on strategic investments and portfolio growth.</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <img src="https://placehold.co/150x150/818cf8/ffffff?text=Jane+S" alt="Jane Smith" class="w-36 h-36 rounded-full object-cover mb-4 shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">Jane Smith</h4>
+                        <p class="text-indigo-600 text-sm">Investment Director</p>
+                        <p class="text-gray-600 text-center text-sm mt-2">Specializes in FinTech and AI startups.</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <img src="https://placehold.co/150x150/818cf8/ffffff?text=Peter+J" alt="Peter Jones" class="w-36 h-36 rounded-full object-cover mb-4 shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">Peter Jones</h4>
+                        <p class="text-indigo-600 text-sm">Head of Incubation</p>
+                        <p class="text-gray-600 text-center text-sm mt-2">Guides early-stage companies through incubation.</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <img src="https://placehold.co/150x150/818cf8/ffffff?text=Sarah+W" alt="Sarah Williams" class="w-36 h-36 rounded-full object-cover mb-4 shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">Sarah Williams</h4>
+                        <p class="text-indigo-600 text-sm">Community Manager</p>
+                        <p class="text-gray-600 text-center text-sm mt-2">Builds and nurtures our vibrant startup community.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Insights & News Section (New) -->
+        <section id="insights" class="py-16 md:py-24 bg-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6">
+            <div class="container mx-auto text-center">
+                <h3 class="text-3xl md:text-4xl font-bold text-indigo-800 mb-12">Insights & News</h3>
+                <p class="text-lg text-gray-700 mb-10 max-w-3xl mx-auto">
+                    Stay updated with the latest trends in venture capital, startup ecosystem news, and Republica Industries' announcements.
+                </p>
+                <div id="insights-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Insights/Blog Posts will be loaded dynamically from Firestore -->
+                    <div class="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 text-left">
+                        <img src="https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+1" alt="Blog Post Image" class="w-full h-48 object-cover rounded-md mb-4">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-2">The Future of AI in Startups</h4>
+                        <p class="text-gray-600 text-sm mb-3">
+                            An in-depth look at how artificial intelligence is shaping the next wave of innovation.
+                        </p>
+                        <a href="#" class="text-indigo-600 hover:underline font-medium">Read More &rarr;</a>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 text-left">
+                        <img src="https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+2" alt="Blog Post Image" class="w-full h-48 object-cover rounded-md mb-4">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Republica's Latest Investment: HealthTech Startup</h4>
+                        <p class="text-gray-600 text-sm mb-3">
+                            Announcing our strategic investment in a groundbreaking digital health platform.
+                        </p>
+                        <a href="#" class="text-indigo-600 hover:underline font-medium">Read More &rarr;</a>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 text-left">
+                        <img src="https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+3" alt="Blog Post Image" class="w-full h-48 object-cover rounded-md mb-4">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Navigating Seed Funding: A Founder's Guide</h4>
+                        <p class="text-gray-600 text-sm mb-3">
+                            Essential tips and strategies for securing your first round of seed investment.
+                        </p>
+                        <a href="#" class="text-indigo-600 hover:underline font-medium">Read More &rarr;</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action / Contact Section -->
+        <section id="contact" class="py-16 md:py-24 bg-gradient-to-r from-purple-700 to-indigo-700 text-white rounded-xl shadow-lg mx-auto max-w-6xl mt-12 px-6 text-center">
+            <div class="container mx-auto">
+                <h3 class="text-3xl md:text-4xl font-bold mb-6">Ready to Build Your Future?</h3>
+                <p class="text-lg md:text-xl mb-10 max-w-3xl mx-auto opacity-90">
+                    Whether you have a nascent idea or a growing startup, Republica Industries is here to help. Reach out to discuss how we can support your journey.
+                </p>
+                <a href="mailto:info@republicaindustries.com" class="btn-primary inline-block bg-white text-indigo-700 hover:bg-gray-100 hover:text-indigo-800 transition-colors duration-300">
+                    Contact Us Today
+                </a>
+                <p class="mt-8 text-sm opacity-80">
+                    Or email us directly at <a href="mailto:info@republicaindustries.com" class="underline hover:text-gray-200">info@republicaindustries.com</a>
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer Section -->
+    <footer class="bg-gray-800 text-gray-300 py-8 mt-12 rounded-t-lg shadow-inner">
+        <div class="container mx-auto px-6 text-center">
+            <p class="mb-4">&copy; 2025 Republica Industries. All rights reserved.</p>
+            <div class="flex justify-center space-x-6">
+                <a href="#" class="hover:text-white transition-colors duration-300" aria-label="Facebook"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.262c-1.247 0-1.64.773-1.64 1.57v1.88h2.773l-.443 2.89h-2.33V22C18.343 21.128 22 16.991 22 12c0-5.523-4.477-10-10-10z"/></svg></a>
+                <a href="#" class="hover:text-white transition-colors duration-300" aria-label="Twitter"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.46 6c-.8.36-1.64.6-2.52.7.92-.56 1.62-1.48 1.95-2.56-.86.52-1.8.9-2.8 1.1-.82-.88-2-1.44-3.32-1.44-2.52 0-4.56 2.04-4.56 4.56 0 .36.04.72.12 1.04-3.78-.18-7.14-2-9.42-4.76-.4.68-.64 1.48-.64 2.32 0 1.58.8 2.98 2 3.8-.74-.02-1.44-.22-2.04-.56v.06c0 2.2 1.56 4.04 3.6 4.48-.38.1-.78.16-1.2.16-.28 0-.56-.02-.82-.08.58 1.8 2.26 3.12 4.24 3.16-1.56 1.22-3.52 1.96-5.64 1.96-.36 0-.7-.02-1.04-.06C3.42 20.18 5.6 21 8 21c9.6 0 14.86-7.96 14.86-14.86 0-.22-.0-.44-.02-.66.96-.7 1.78-1.56 2.44-2.56z"/></svg></a>
+                <a href="#" class="hover:text-white transition-colors duration-300" aria-label="LinkedIn"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.276V9.288h3.406v1.565h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.923-2.063-2.065 0-1.145.92-2.066 2.063-2.066 1.145 0 2.066.921 2.066 2.066 0 1.142-.921 2.065-2.066 2.065zm1.781 13.019H3.554V9.288h3.564v11.164z"/></svg></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Admin Panel Toggle Button -->
+    <button id="admin-panel-toggle" class="fixed bottom-4 left-4 bg-indigo-600 text-white p-3 rounded-full shadow-lg hover:bg-indigo-700 transition-colors z-[1000] hidden" onclick="document.getElementById('admin-panel').classList.toggle('hidden');">
+        ⚙️ Admin
+    </button>
+
+    <!-- Admin Panel (Hidden by default) -->
+    <div id="admin-panel" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[900] flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-4xl h-[90vh] overflow-y-auto relative">
+            <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-3xl" onclick="document.getElementById('admin-panel').classList.add('hidden');">&times;</button>
+            <h2 class="text-3xl font-bold text-indigo-800 mb-6 text-center">Admin Panel</h2>
+
+            <!-- Admin Tabs -->
+            <div class="flex border-b border-gray-200 mb-6">
+                <button class="tab-button active" onclick="openAdminTab(event, 'about-content')">About Us</button>
+                <button class="tab-button" onclick="openAdminTab(event, 'services-content')">Services</button>
+                <button class="tab-button" onclick="openAdminTab(event, 'portfolio-content')">Portfolio</button>
+                <button class="tab-button" onclick="openAdminTab(event, 'team-content')">Team</button>
+                <button class="tab-button" onclick="openAdminTab(event, 'insights-content')">Insights</button>
+                <button class="tab-button ml-auto bg-red-500 text-white hover:bg-red-600 rounded-b-none" onclick="adminLogout()">Logout</button>
+            </div>
+
+            <!-- About Us Content Tab -->
+            <div id="about-content" class="admin-section active">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Edit About Us Section</h3>
+                <div class="mb-4">
+                    <label for="edit-about-title" class="block text-gray-700 text-sm font-bold mb-2">Title:</label>
+                    <input type="text" id="edit-about-title" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label for="edit-about-paragraph-1" class="block text-gray-700 text-sm font-bold mb-2">Paragraph 1:</label>
+                    <textarea id="edit-about-paragraph-1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-about-paragraph-2" class="block text-gray-700 text-sm font-bold mb-2">Paragraph 2:</label>
+                    <textarea id="edit-about-paragraph-2" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-about-paragraph-3" class="block text-gray-700 text-sm font-bold mb-2">Paragraph 3:</label>
+                    <textarea id="edit-about-paragraph-3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                </div>
+                <div class="mb-6">
+                    <label for="edit-about-image-url" class="block text-gray-700 text-sm font-bold mb-2">Image URL:</label>
+                    <input type="text" id="edit-about-image-url" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <button class="btn-primary w-full" onclick="saveAboutUsContent()">Save About Us</button>
+            </div>
+
+            <!-- Services Content Tab -->
+            <div id="services-content" class="admin-section">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Edit Services Section (JSON)</h3>
+                <p class="text-gray-600 mb-4">Edit the services data in JSON format. Each service should have `icon`, `title`, and `description` fields.</p>
+                <div class="mb-6">
+                    <label for="edit-services-json" class="block text-gray-700 text-sm font-bold mb-2">Services JSON:</label>
+                    <textarea id="edit-services-json" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono text-sm" rows="15">
+[
+    { "icon": "💡", "title": "Startup Incubation", "description": "Comprehensive programs for early-stage startups, providing workspace, mentorship, and essential resources to help ideas flourish." },
+    { "icon": " ", "title": "Strategic Mentorship", "description": "Connect with industry veterans and successful entrepreneurs for personalized guidance on business strategy, product development, and market fit." },
+    { "icon": "💰", "title": "Funding & Investment", "description": "Access to our network of angel investors, venture capitalists, and grant opportunities to secure the capital you need to scale." },
+    { "icon": "📈", "title": "Business Development", "description": "Assistance in crafting robust business plans, market analysis, and go-to-market strategies to ensure sustainable growth." },
+    { "icon": "💻", "title": "Technology & Product Support", "description": "Guidance on technology stacks, product roadmaps, UI/UX design, and engineering best practices to build cutting-edge solutions." },
+    { "icon": "🌐", "title": "Networking & Community", "description": "Become part of a vibrant ecosystem of founders, investors, and industry leaders through exclusive events and collaborative spaces." }
+]
+                    </textarea>
+                </div>
+                <button class="btn-primary w-full" onclick="saveServicesContent()">Save Services</button>
+            </div>
+
+            <!-- Portfolio Content Tab -->
+            <div id="portfolio-content" class="admin-section">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Edit Portfolio Section (JSON)</h3>
+                <p class="text-gray-600 mb-4">Edit the portfolio companies data in JSON format. Each company should have `name`, `sector`, and `logoUrl` fields.</p>
+                <div class="mb-6">
+                    <label for="edit-portfolio-json" class="block text-gray-700 text-sm font-bold mb-2">Portfolio JSON:</label>
+                    <textarea id="edit-portfolio-json" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono text-sm" rows="15">
+[
+    { "name": "InnovateTech", "sector": "AI Solutions", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+A" },
+    { "name": "HealthConnect", "sector": "Digital Health", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+B" },
+    { "name": "EduSpark", "sector": "EdTech Platform", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+C" },
+    { "name": "GreenHarvest", "sector": "AgriTech", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+D" },
+    { "name": "FinFlow", "sector": "FinTech Solutions", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+E" },
+    { "name": "Urban Mobility", "sector": "Smart Cities", "logoUrl": "https://placehold.co/100x100/6366f1/ffffff?text=Company+F" }
+]
+                    </textarea>
+                </div>
+                <button class="btn-primary w-full" onclick="savePortfolioContent()">Save Portfolio</button>
+            </div>
+
+            <!-- Team Content Tab -->
+            <div id="team-content" class="admin-section">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Edit Team Section (JSON)</h3>
+                <p class="text-gray-600 mb-4">Edit the team members data in JSON format. Each member should have `name`, `role`, `bio`, and `imageUrl` fields.</p>
+                <div class="mb-6">
+                    <label for="edit-team-json" class="block text-gray-700 text-sm font-bold mb-2">Team JSON:</label>
+                    <textarea id="edit-team-json" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono text-sm" rows="15">
+[
+    { "name": "John Doe", "role": "Managing Partner", "bio": "Focuses on strategic investments and portfolio growth.", "imageUrl": "https://placehold.co/150x150/818cf8/ffffff?text=John+D" },
+    { "name": "Jane Smith", "role": "Investment Director", "bio": "Specializes in FinTech and AI startups.", "imageUrl": "https://placehold.co/150x150/818cf8/ffffff?text=Jane+S" },
+    { "name": "Peter Jones", "role": "Head of Incubation", "bio": "Guides early-stage companies through incubation.", "imageUrl": "https://placehold.co/150x150/818cf8/ffffff?text=Peter+J" },
+    { "name": "Sarah Williams", "role": "Community Manager", "bio": "Builds and nurtures our vibrant startup community.", "imageUrl": "https://placehold.co/150x150/818cf8/ffffff?text=Sarah+W" }
+]
+                    </textarea>
+                </div>
+                <button class="btn-primary w-full" onclick="saveTeamContent()">Save Team</button>
+            </div>
+
+            <!-- Insights Content Tab -->
+            <div id="insights-content" class="admin-section">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Edit Insights Section (JSON)</h3>
+                <p class="text-gray-600 mb-4">Edit the insights/news posts data in JSON format. Each post should have `title`, `content`, `imageUrl`, and `link` fields.</p>
+                <div class="mb-6">
+                    <label for="edit-insights-json" class="block text-gray-700 text-sm font-bold mb-2">Insights JSON:</label>
+                    <textarea id="edit-insights-json" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono text-sm" rows="15">
+[
+    { "title": "The Future of AI in Startups", "content": "An in-depth look at how artificial intelligence is shaping the next wave of innovation.", "imageUrl": "https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+1", "link": "#" },
+    { "title": "Republica's Latest Investment: HealthTech Startup", "content": "Announcing our strategic investment in a groundbreaking digital health platform.", "imageUrl": "https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+2", "link": "#" },
+    { "title": "Navigating Seed Funding: A Founder's Guide", "content": "Essential tips and strategies for securing your first round of seed investment.", "imageUrl": "https://placehold.co/400x250/e0e7ff/4f46e5?text=Blog+Post+3", "link": "#" }
+]
+                    </textarea>
+                </div>
+                <button class="btn-primary w-full" onclick="saveInsightsContent()">Save Insights</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal (Initially visible) -->
+    <div id="login-modal" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[1100] flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold text-indigo-800 mb-6 text-center">Admin Login</h2>
+            <div class="mb-4">
+                <label for="admin-username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
+                <input type="text" id="admin-username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="admin123">
+            </div>
+            <div class="mb-6">
+                <label for="admin-password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
+                <input type="password" id="admin-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" value="admin321">
+            </div>
+            <button class="btn-primary w-full" onclick="adminLogin()">Login</button>
+        </div>
+    </div>
+
+    <!-- Message Box for notifications (hidden by default) -->
+    <div id="message-box" class="hidden"></div>
+
+
+    <script defer>
+        // JavaScript for mobile menu toggle
+        const mobileMenuButton = document.querySelector('header button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const closeMobileMenuButton = mobileMenu.querySelector('button');
+
+        function toggleMobileMenu() {
+            mobileMenu.classList.toggle('hidden');
+        }
+
+        mobileMenuButton.addEventListener('click', toggleMobileMenu);
+        closeMobileMenuButton.addEventListener('click', toggleMobileMenu);
+
+        // Close mobile menu when a link is clicked
+        const mobileMenuLinks = mobileMenu.querySelectorAll('a');
+        mobileMenuLinks.forEach(link => {
+            link.addEventListener('click', toggleMobileMenu);
+        });
+
+        // Admin Panel Tab Switching
+        function openAdminTab(evt, tabName) {
+            // Declare all variables
+            var i, tabcontent, tablinks;
+
+            // Get all elements with class="admin-section" and hide them
+            tabcontent = document.getElementsByClassName("admin-section");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove("active");
+            }
+
+            // Get all elements with class="tab-button" and remove the "active" class
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].classList.remove("active");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+
+        // Three.js Scene Setup
+        let scene, camera, renderer, cubes;
+        let mouseX = 0, mouseY = 0;
+        let windowHalfX = window.innerWidth / 2;
+        let windowHalfY = window.innerHeight / 2;
+
+        function initThreeJS() {
+            const container = document.getElementById('home'); // Get the hero section
+            const canvas = document.getElementById('three-canvas');
+
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Create Cubes
+            cubes = [];
+            const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const material = new THREE.MeshBasicMaterial({ color: 0x818cf8, wireframe: true }); // Indigo-400 wireframe
+
+            for (let i = 0; i < 50; i++) {
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.x = (Math.random() - 0.5) * 20;
+                cube.position.y = (Math.random() - 0.5) * 20;
+                cube.position.z = (Math.random() - 0.5) * 20;
+                cubes.push(cube);
+                scene.add(cube);
+            }
+
+            // Lighting (optional, but good practice even for basic materials)
+            const ambientLight = new THREE.AmbientLight(0x404040); // soft white light
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(0, 1, 0);
+            scene.add(directionalLight);
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+            document.addEventListener('touchmove', onDocumentTouchMove, { passive: false });
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('home');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            windowHalfX = window.innerWidth / 2;
+            windowHalfY = window.innerHeight / 2;
+        }
+
+        function onDocumentMouseMove(event) {
+            mouseX = (event.clientX - windowHalfX) / 100;
+            mouseY = (event.clientY - windowHalfY) / 100;
+        }
+
+        function onDocumentTouchMove(event) {
+            if (event.touches.length === 1) {
+                event.preventDefault(); // Prevent scrolling
+                mouseX = (event.touches[0].pageX - windowHalfX) / 100;
+                mouseY = (event.touches[0].pageY - windowHalfY) / 100;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate cubes
+            cubes.forEach(cube => {
+                cube.rotation.x += 0.005;
+                cube.rotation.y += 0.005;
+            });
+
+            // Camera movement based on mouse
+            camera.position.x += (mouseX - camera.position.x) * .05;
+            camera.position.y += (-mouseY - camera.position.y) * .05;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize Three.js and Firebase when the window loads
+        window.onload = function() {
+            initThreeJS();
+            initFirebase(); // Initialize Firebase after Three.js
+        };
+    </script>
+</body>
+</html>
+ 
